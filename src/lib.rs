@@ -1,6 +1,8 @@
+
 mod config;
 mod mqtt_client;
 mod spawn_stats;
+mod stats;
 
 #[cfg(test)]
 mod tests {

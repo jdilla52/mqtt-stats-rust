@@ -17,6 +17,7 @@ extern crate serde;
 
 use serde::{Deserialize, Serialize};
 use tokio::io::AsyncReadExt;
+use crate::stats::TopicStats;
 
 // we will lock these as a group for group wise access
 // it will also allow for easy serialization
@@ -41,70 +42,14 @@ impl Default for SpawnStats {
     }
 }
 
-pub struct Spawn {
+pub struct Spawn{
     settings: MqttSettings,
     mqtt_client: MqttClient,
     stats: Arc<Mutex<SpawnStats>>,
     topics: Arc<RwLock<HashMap<String, TopicStats>>>
 }
 
-#[derive(Clone, Copy)]
-pub struct MessageStats {
-    bytes: i32,
-    time:SystemTime
-}
-
-impl MessageStats {
-    pub fn new()->Self{
-        MessageStats{
-            bytes: 0,
-            time: SystemTime::now(),
-        }
-    }
-
-    pub fn from_time(time: SystemTime) -> Self {
-       MessageStats{
-           time,
-           bytes: 0
-       }
-    }
-}
-
-// all entries must hold both the current and the last entry.
-// we'll use the convention $ as the old key
-// we'll move to a message buffer ie an index up to 100.
-#[derive(Clone, Copy)]
-pub struct TopicStats {
-    // comparison stats
-    old: MessageStats,
-    last: MessageStats,
-    // meta stats
-    qos: i32,
-    created: SystemTime
-}
-
-impl TopicStats {
-    pub fn new(bytes: i32, qos: i32)->Self{
-        let time = SystemTime::now();
-        TopicStats{
-            old: MessageStats::from_time(time),
-            last: MessageStats{bytes, time},
-            qos,
-            created: time
-        }
-    }
-
-    pub fn swap(&self, bytes: i32, qos: i32) -> Self{
-        TopicStats{
-            old: self.last,
-            last: MessageStats{bytes, time: SystemTime::now()},
-            qos,
-            created: self.created
-        }
-    }
-}
-
-impl Spawn {
+impl  Spawn{
     pub async fn new(settings: MqttSettings) -> Spawn {
         let mqtt_client = MqttClient::new(settings.clone()).await;
         mqtt_client.subscribe().await; // maybe move
@@ -138,7 +83,7 @@ impl Spawn {
                         // we'll update props on topic stats
                         let mut item = tw.get_mut(topic)
                             .unwrap()
-                            .swap(msg.payload().len() as i32,5);
+                            .create_datapoint(msg.payload().len() as i32,5);
                         tw.insert(msg.topic().to_string(), item);
                         drop(tw); // drop guard
                     }
