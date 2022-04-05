@@ -48,17 +48,29 @@ pub struct Spawn {
     topics: Arc<RwLock<HashMap<String, TopicStats>>>
 }
 
+#[derive(Clone, Copy)]
+pub struct MessageStats {
+    bytes: i32,
+    time:SystemTime
+}
+
+impl MessageStats {
+    pub fn new()->Self{
+        MessageStats{
+            bytes: 0,
+            time: SystemTime::now(),
+        }
+    }
+}
+
 // all entries must hold both the current and the last entry.
 // we'll use the convention $ as the old key
 // we'll move to a message buffer ie an index up to 100.
 #[derive(Clone, Copy)]
 pub struct TopicStats {
     // comparison stats
-    bytes: i32,
-    time: SystemTime,
-    old_bytes: i32,
-    old_time: SystemTime,
-
+    old: MessageStats,
+    last: MessageStats,
     // meta stats
     qos: i32,
 }
@@ -66,20 +78,16 @@ pub struct TopicStats {
 impl TopicStats {
     pub fn new(bytes: i32, qos: i32)->Self{
         TopicStats{
-            bytes,
-            time: SystemTime::now(),
-            old_bytes: 0,
-            old_time: SystemTime::now(),
+            old: MessageStats::new(),
+            last: MessageStats::new(),
             qos
         }
     }
 
     pub fn swap(&self, bytes: i32, qos: i32) -> Self{
         TopicStats{
-            bytes,
-            time: SystemTime::now(),
-            old_bytes: self.bytes,
-            old_time: self.time,
+            old: self.last,
+            last: MessageStats{bytes, time: SystemTime::now()},
             qos
         }
     }
