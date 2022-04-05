@@ -45,7 +45,44 @@ pub struct Spawn {
     settings: MqttSettings,
     mqtt_client: MqttClient,
     stats: Arc<Mutex<SpawnStats>>,
-    topics: Arc<RwLock<HashMap<String, String>>>
+    topics: Arc<RwLock<HashMap<String, TopicStats>>>
+}
+
+// all entries must hold both the current and the last entry.
+// we'll use the convention $ as the old key
+// we'll move to a message buffer ie an index up to 100.
+#[derive(Clone, Copy)]
+pub struct TopicStats {
+    // comparison stats
+    bytes: i32,
+    time: SystemTime,
+    old_bytes: i32,
+    old_time: SystemTime,
+
+    // meta stats
+    qos: i32,
+}
+
+impl TopicStats {
+    pub fn new(bytes: i32, qos: i32)->Self{
+        TopicStats{
+            bytes,
+            time: SystemTime::now(),
+            old_bytes: 0,
+            old_time: SystemTime::now(),
+            qos
+        }
+    }
+
+    pub fn swap(&self, bytes: i32, qos: i32) -> Self{
+        TopicStats{
+            bytes,
+            time: SystemTime::now(),
+            old_bytes: self.bytes,
+            old_time: self.time,
+            qos
+        }
+    }
 }
 
 impl Spawn {
@@ -60,6 +97,7 @@ impl Spawn {
             topics: Arc::new(RwLock::new(HashMap::new()))
         }
     }
+
     pub async fn run(&mut self) {
         // spawn_api(&self.settings.http_settings, &self.bridge_stats);
 
@@ -73,12 +111,24 @@ impl Spawn {
                     let tg = topics.read().await;
                     guard.messages_received +=1;
                     guard.last_received +=1;
-                    if tg.contains_key(msg.topic()) {
+                    let topic = msg.topic();
+                    if tg.contains_key(topic) {
                         // we'll update props on topic stats
+                        let mut tw = topics.write().await;
+                        let mut item = tw.get_mut(topic)
+                            .unwrap()
+                            .swap(msg.payload().len() as i32,5);
+                        tw.insert(msg.topic().to_string(), item);
                     }
                     else{
                         let mut tw = topics.write().await;
-                        tw.insert(msg.topic().to_string(), msg.to_string());
+
+                        let new_entry = TopicStats::new(
+                            msg.payload().len() as i32,
+                            msg.qos()
+                        );
+
+                        tw.insert(msg.topic().to_string(), new_entry);
                         drop(tw); // drop guard
                         guard.num_topics +=1;
                     }
