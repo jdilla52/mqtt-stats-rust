@@ -111,26 +111,32 @@ impl Spawn {
                     let tg = topics.read().await;
                     guard.messages_received +=1;
                     guard.last_received +=1;
+                    drop(guard); // drop guard
+
                     let topic = msg.topic();
                     if tg.contains_key(topic) {
-                        // we'll update props on topic stats
                         let mut tw = topics.write().await;
+                        // we'll update props on topic stats
                         let mut item = tw.get_mut(topic)
                             .unwrap()
                             .swap(msg.payload().len() as i32,5);
                         tw.insert(msg.topic().to_string(), item);
+                        drop(tw); // drop guard
                     }
                     else{
-                        let mut tw = topics.write().await;
-
+                        // new topic entry
                         let new_entry = TopicStats::new(
                             msg.payload().len() as i32,
                             msg.qos()
                         );
-
+                        let mut tw = topics.write().await;
                         tw.insert(msg.topic().to_string(), new_entry);
-                        drop(tw); // drop guard
-                        guard.num_topics +=1;
+                        drop(tw);
+
+                        // deal with stats
+                        let mut stat_guard = stats.lock().await;
+                        stat_guard.num_topics +=1;
+                        drop(stat_guard); // drop guard
                     }
                 });
             } else {
