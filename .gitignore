@@ -19,4 +19,6 @@ scratch/
 /target
 /Cargo.lock
 
-*.config
+*.conf
+
+src/mqtt_client.rs

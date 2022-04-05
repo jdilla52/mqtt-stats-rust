@@ -127,7 +127,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_connection() {
-        let client = MqttClient::new(confy::load_path("./default.config").unwrap()).await;
+        let client = MqttClient::new(confy::load_path("../default.conf").unwrap()).await;
     }
 
     // #[tokio::test]
