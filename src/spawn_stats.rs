@@ -61,6 +61,13 @@ impl MessageStats {
             time: SystemTime::now(),
         }
     }
+
+    pub fn from_time(time: SystemTime) -> Self {
+       MessageStats{
+           time,
+           bytes: 0
+       }
+    }
 }
 
 // all entries must hold both the current and the last entry.
@@ -78,11 +85,12 @@ pub struct TopicStats {
 
 impl TopicStats {
     pub fn new(bytes: i32, qos: i32)->Self{
+        let time = SystemTime::now();
         TopicStats{
-            old: MessageStats::new(),
-            last: MessageStats::new(),
+            old: MessageStats::from_time(time),
+            last: MessageStats{bytes, time},
             qos,
-            created: SystemTime::now()
+            created: time
         }
     }
 
