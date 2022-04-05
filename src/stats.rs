@@ -32,7 +32,8 @@ pub struct TopicStats {
     last: MessageStats,
     // meta stats
     qos: i32,
-    created: SystemTime
+    created: SystemTime,
+    message_count: i64
 }
 
 impl TopicStats {
@@ -42,7 +43,8 @@ impl TopicStats {
             old: MessageStats::from_time(time),
             last: MessageStats{bytes, time},
             qos,
-            created: time
+            created: time,
+            message_count: 0
         }
     }
 
@@ -52,7 +54,8 @@ impl TopicStats {
             old: self.last,
             last: MessageStats{bytes, time: SystemTime::now()},
             qos,
-            created: self.created
+            created: self.created,
+            message_count: self.message_count + 1
         }
     }
 }
@@ -66,5 +69,11 @@ mod stats_tests{
         let mut tp = TopicStats::new(12, 2);
         let tp = tp.create_datapoint(32, 1);
         assert_eq!(tp.last.bytes, 32);
+    }
+    #[test]
+    fn test_messages(){
+        let mut tp = TopicStats::new(12, 2);
+        let tp = tp.create_datapoint(32, 1);
+        assert_eq!(tp.message_count, 1);
     }
 }
