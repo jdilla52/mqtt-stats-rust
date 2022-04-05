@@ -12,41 +12,33 @@ extern crate serde;
 
 use serde::{Deserialize, Serialize};
 
+// we will lock these as a group for group wise access
+// it will also allow for easy serialization
 #[derive(Serialize, Deserialize, Clone)]
 pub struct SpawnStats {
-    skipped_messages: i32,
-    routed_messages: i32,
-    errors: i32,
-    connection_error: i32,
-    start_time: SystemTime,
+    messages_received: i64,
+    last_received: i64,
+    num_topics: i64,
+    connection_error: i64,
+    start_time: SystemTime
 }
 
 impl Default for SpawnStats {
     fn default() -> Self {
         SpawnStats {
-            skipped_messages: 0,
-            routed_messages: 0,
-            errors: 0,
+            messages_received: 0,
+            last_received: 0,
+            num_topics: 0,
             connection_error: 0,
             start_time: SystemTime::now(),
         }
     }
 }
 
-impl SpawnStats {
-    pub(crate) fn as_json(&self) -> String {
-        return serde_json::to_string(&self).unwrap();
-    }
-
-    fn from_json(s: &str) -> Self {
-        return serde_json::from_str(s).unwrap();
-    }
-}
-
 pub struct Spawn {
     settings: MqttSettings,
     mqtt_client: MqttClient,
-    bridge_stats: Arc<Mutex<SpawnStats>>,
+    stats: Arc<Mutex<SpawnStats>>,
 }
 
 fn mqtt_to_kafka_topic(v: &str) -> String {
@@ -57,23 +49,23 @@ impl Spawn {
     pub async fn new(settings: MqttSettings) -> Spawn {
         let mqtt_client = MqttClient::new(settings.clone()).await;
         mqtt_client.subscribe().await; // maybe move
-
+        
         Spawn {
             mqtt_client,
             settings,
-            bridge_stats: Arc::new(Mutex::new(SpawnStats::default())),
+            stats: Arc::new(Mutex::new(SpawnStats::default())),
         }
     }
     pub async fn run(&mut self) {
         // spawn_api(&self.settings.http_settings, &self.bridge_stats);
         while let Some(msg_opt) = self.mqtt_client.message_stream.next().await {
             if let Some(msg) = msg_opt {
-                let stats = Arc::clone(&self.bridge_stats);
+                let stats = Arc::clone(&self.stats);
                 tokio::spawn(async move {
                     let mut guard = stats.lock().await;
                 });
             } else {
-                let mut guard = self.bridge_stats.lock().await;
+                let mut guard = self.stats.lock().await;
                 guard.connection_error += 1;
                 // A "None" means we were disconnected. Try to reconnect...
                 println!("Lost connection. Attempting reconnect.");
