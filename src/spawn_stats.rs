@@ -1,13 +1,16 @@
 #![allow(dead_code)]
 
+use std::collections::HashMap;
 use crate::config::{MqttSettings, StatsSettings};
 use crate::mqtt_client::MqttClient;
 use futures::StreamExt;
 use log::{debug, error};
 use std::sync::Arc;
 use std::time::SystemTime;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 use uuid::Uuid;
+// use dashmap::DashMap;
+
 extern crate serde;
 
 use serde::{Deserialize, Serialize};
@@ -39,10 +42,7 @@ pub struct Spawn {
     settings: MqttSettings,
     mqtt_client: MqttClient,
     stats: Arc<Mutex<SpawnStats>>,
-}
-
-fn mqtt_to_kafka_topic(v: &str) -> String {
-    str::replace(v, "/", "-")
+    topics:RwLock<HashMap<String, String>>
 }
 
 impl Spawn {
@@ -54,6 +54,7 @@ impl Spawn {
             mqtt_client,
             settings,
             stats: Arc::new(Mutex::new(SpawnStats::default())),
+            topics: RwLock::new(HashMap::new())
         }
     }
     pub async fn run(&mut self) {
