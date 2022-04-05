@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use std::borrow::Borrow;
 use std::collections::HashMap;
 use crate::config::{MqttSettings, StatsSettings};
 use crate::mqtt_client::MqttClient;
@@ -11,9 +12,11 @@ use tokio::sync::{Mutex, RwLock};
 use uuid::Uuid;
 // use dashmap::DashMap;
 
+
 extern crate serde;
 
 use serde::{Deserialize, Serialize};
+use tokio::io::AsyncReadExt;
 
 // we will lock these as a group for group wise access
 // it will also allow for easy serialization
@@ -42,7 +45,7 @@ pub struct Spawn {
     settings: MqttSettings,
     mqtt_client: MqttClient,
     stats: Arc<Mutex<SpawnStats>>,
-    topics:RwLock<HashMap<String, String>>
+    topics: Arc<RwLock<HashMap<String, String>>>
 }
 
 impl Spawn {
@@ -54,16 +57,21 @@ impl Spawn {
             mqtt_client,
             settings,
             stats: Arc::new(Mutex::new(SpawnStats::default())),
-            topics: RwLock::new(HashMap::new())
+            topics: Arc::new(RwLock::new(HashMap::new()))
         }
     }
     pub async fn run(&mut self) {
         // spawn_api(&self.settings.http_settings, &self.bridge_stats);
+
         while let Some(msg_opt) = self.mqtt_client.message_stream.next().await {
             if let Some(msg) = msg_opt {
                 let stats = Arc::clone(&self.stats);
+                let topics = Arc::clone(&self.topics);
+                // let mut topics = Arc::clone(&self.topics);
                 tokio::spawn(async move {
                     let mut guard = stats.lock().await;
+                    let topics = topics.read().await;
+
                 });
             } else {
                 let mut guard = self.stats.lock().await;
