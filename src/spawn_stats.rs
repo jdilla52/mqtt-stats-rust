@@ -73,6 +73,7 @@ pub struct TopicStats {
     last: MessageStats,
     // meta stats
     qos: i32,
+    created: SystemTime
 }
 
 impl TopicStats {
@@ -80,7 +81,8 @@ impl TopicStats {
         TopicStats{
             old: MessageStats::new(),
             last: MessageStats::new(),
-            qos
+            qos,
+            created: SystemTime::now()
         }
     }
 
@@ -88,7 +90,8 @@ impl TopicStats {
         TopicStats{
             old: self.last,
             last: MessageStats{bytes, time: SystemTime::now()},
-            qos
+            qos,
+            created: self.created
         }
     }
 }
