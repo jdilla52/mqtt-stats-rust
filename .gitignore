@@ -18,3 +18,5 @@ scratch/
 
 /target
 /Cargo.lock
+
+*.config

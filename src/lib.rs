@@ -1,3 +1,4 @@
+mod mqtt_client;
 #[cfg(test)]
 mod tests {
     #[test]
