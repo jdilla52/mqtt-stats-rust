@@ -70,8 +70,18 @@ impl Spawn {
                 // let mut topics = Arc::clone(&self.topics);
                 tokio::spawn(async move {
                     let mut guard = stats.lock().await;
-                    let topics = topics.read().await;
-
+                    let tg = topics.read().await;
+                    guard.messages_received +=1;
+                    guard.last_received +=1;
+                    if tg.contains_key(msg.topic()) {
+                        // we'll update props on topic stats
+                    }
+                    else{
+                        let mut tw = topics.write().await;
+                        tw.insert(msg.topic().to_string(), msg.to_string());
+                        drop(tw); // drop guard
+                        guard.num_topics +=1;
+                    }
                 });
             } else {
                 let mut guard = self.stats.lock().await;
