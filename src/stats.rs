@@ -40,6 +40,8 @@ pub struct TopicStats {
     bytes_max: i32,
     bytes_avg_variance: f32,
     time_avg_variance: Duration,
+    time_difference_max: Duration,
+    time_difference_min:Duration,
     kbs: f64
 }
 
@@ -57,6 +59,8 @@ impl TopicStats {
             bytes_max: bytes,
             bytes_avg_variance: 0.0,
             time_avg_variance: Duration::seconds(0),
+            time_difference_max: Duration::seconds(0),
+            time_difference_min: Duration::seconds(100000),
             kbs: 0.0
         }
     }
@@ -73,10 +77,12 @@ impl TopicStats {
         let current_bytes_difference = (self.last.bytes - bytes).abs();
         let bytes_avg_variance= self.bytes_avg_variance + (current_bytes_difference as f32 - self.bytes_avg_variance)/self.message_count as f32;
 
-        let current_time_difference = (self.last.time - time) * -1;
-        let time_avg_variance= self.time_avg_variance + (current_time_difference - self.time_avg_variance)/ self.message_count as i32;
+        let time_difference= (self.last.time - time) * -1;
+        let time_difference_max= cmp::max(self.time_difference_max, time_difference);
+        let time_difference_min= cmp::min(self.time_difference_min, time_difference);
+        let time_avg_variance= self.time_avg_variance + (time_difference - self.time_avg_variance)/ self.message_count as i32;
 
-        let kbs = bytes as f64 / current_time_difference.num_nanoseconds().unwrap() as f64 * 8000000.0;
+        let kbs = bytes as f64 / time_difference.num_nanoseconds().unwrap() as f64 * 8000000.0;
 
         // generate a new topic stats object - should probably be mutating current struct
         TopicStats{
@@ -90,6 +96,8 @@ impl TopicStats {
             bytes_max,
             bytes_avg_variance,
             time_avg_variance,
+            time_difference_min,
+            time_difference_max,
             kbs,
 
         }
@@ -103,7 +111,6 @@ mod stats_tests{
     use crate::stats::TopicStats;
     use chrono;
 
-
     #[test]
     fn swap(){
         let mut tp = TopicStats::new(12, 2);
@@ -114,7 +121,7 @@ mod stats_tests{
     fn message_count(){
         let mut tp = TopicStats::new(12, 2);
         let tp = tp.create_datapoint(32, 1);
-        assert_eq!(tp.message_count, 1);
+        assert_eq!(tp.message_count, 2);
     }
     #[test]
     fn rolling_avg(){
@@ -152,8 +159,19 @@ mod stats_tests{
     fn min_max(){
         let mut tp = TopicStats::new(10, 2);
         let tp = tp.create_datapoint(20, 2);
-
         assert_eq!(tp.bytes_min, 10);
         assert_eq!(tp.bytes_max, 20);
+    }
+    #[test]
+    fn min_max_time(){
+        let mut tp = TopicStats::new(10, 2);
+        thread::sleep(Duration::from_secs(1));
+        let tp = tp.create_datapoint(20, 2);
+        thread::sleep(Duration::from_secs(3));
+        let tp = tp.create_datapoint(20, 2);
+        assert!(tp.time_difference_max > chrono::Duration::seconds(3));
+        assert!(tp.time_difference_max < chrono::Duration::seconds(4));
+        assert!(tp.time_difference_min > chrono::Duration::nanoseconds(10));
+        assert!(tp.time_difference_min < chrono::Duration::seconds(2));
     }
 }
