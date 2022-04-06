@@ -36,7 +36,8 @@ pub struct TopicStats {
     message_count: i64,
     bytes_avg: f64,
     bytes_avg_variance: f32,
-    time_avg_variance: Duration
+    time_avg_variance: Duration,
+    kbps: f64
 }
 
 impl TopicStats {
@@ -50,7 +51,8 @@ impl TopicStats {
             message_count: 1,
             bytes_avg: bytes as f64,
             bytes_avg_variance: 0.0,
-            time_avg_variance: Duration::seconds(0)
+            time_avg_variance: Duration::seconds(0),
+            kbps: 0.0
         }
     }
 
@@ -67,6 +69,9 @@ impl TopicStats {
         let current_time_difference = (self.last.time - time) * -1;
         let time_avg_variance= self.time_avg_variance + (current_time_difference - self.time_avg_variance)/ self.message_count as i32;
 
+
+        let kbps = bytes as f64 / current_time_difference.num_nanoseconds().unwrap() as f64 * 8000000.0;
+
         // generate a new topic stats object - should probably be mutating current struct
         TopicStats{
             old: self.last,
@@ -76,7 +81,8 @@ impl TopicStats {
             message_count,
             bytes_avg,
             bytes_avg_variance,
-            time_avg_variance
+            time_avg_variance,
+            kbps
         }
     }
 }
@@ -124,5 +130,12 @@ mod stats_tests{
         let tp = tp.create_datapoint(32, 1);
         let d = chrono::Duration::seconds(1);
         assert!(tp.time_avg_variance > d);
+    }
+    #[test]
+    fn kbps() {
+        let mut tp = TopicStats::new(10, 2);
+        thread::sleep(Duration::from_secs(1));
+        let tp = tp.create_datapoint(20, 2);
+        assert!(tp.kbps > 0.08 );
     }
 }
