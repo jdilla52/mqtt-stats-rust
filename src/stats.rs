@@ -33,7 +33,8 @@ pub struct TopicStats {
     // meta stats
     qos: i32,
     created: SystemTime,
-    message_count: i64
+    message_count: i64,
+    bytes_avg: f64
 }
 
 impl TopicStats {
@@ -44,18 +45,22 @@ impl TopicStats {
             last: MessageStats{bytes, time},
             qos,
             created: time,
-            message_count: 0
+            message_count: 1,
+            bytes_avg: bytes as f64
         }
     }
 
     pub fn create_datapoint(&self, bytes: i32, qos: i32) -> Self{
+
+        let message_count = self.message_count + 1;
         // generate a new topic stats object - should probably be mutating current struct
         TopicStats{
             old: self.last,
             last: MessageStats{bytes, time: SystemTime::now()},
             qos,
             created: self.created,
-            message_count: self.message_count + 1
+            message_count,
+            bytes_avg: self.bytes_avg + (bytes as f64 - self.bytes_avg)/message_count as f64
         }
     }
 }
@@ -75,5 +80,13 @@ mod stats_tests{
         let mut tp = TopicStats::new(12, 2);
         let tp = tp.create_datapoint(32, 1);
         assert_eq!(tp.message_count, 1);
+    }
+
+    #[test]
+    fn rolling_bytes(){
+        let mut tp = TopicStats::new(12, 2);
+        let tp = tp.create_datapoint(32, 1);
+
+        assert_eq!(tp.bytes_avg, 22.0);
     }
 }
