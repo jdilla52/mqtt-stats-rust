@@ -1,4 +1,5 @@
-use chrono::{DateTime, Duration, NaiveTime, Utc};
+use std::cmp;
+use chrono::{DateTime, Duration, NaiveTime, Timelike, Utc};
 
 #[derive(Clone, Copy)]
 pub struct MessageStats {
@@ -35,9 +36,11 @@ pub struct TopicStats {
     created: NaiveTime,
     message_count: i64,
     bytes_avg: f64,
+    bytes_min: i32,
+    bytes_max: i32,
     bytes_avg_variance: f32,
     time_avg_variance: Duration,
-    kbps: f64
+    kbs: f64
 }
 
 impl TopicStats {
@@ -50,9 +53,11 @@ impl TopicStats {
             created: time,
             message_count: 1,
             bytes_avg: bytes as f64,
+            bytes_min: bytes,
+            bytes_max: bytes,
             bytes_avg_variance: 0.0,
             time_avg_variance: Duration::seconds(0),
-            kbps: 0.0
+            kbs: 0.0
         }
     }
 
@@ -62,6 +67,8 @@ impl TopicStats {
         let time = Utc::now().time();
 
         let bytes_avg = self.bytes_avg + (bytes as f64 - self.bytes_avg)/message_count as f64;
+        let bytes_max = cmp::max(self.bytes_max, bytes);
+        let bytes_min= cmp::min(self.bytes_min, bytes);
 
         let current_bytes_difference = (self.last.bytes - bytes).abs();
         let bytes_avg_variance= self.bytes_avg_variance + (current_bytes_difference as f32 - self.bytes_avg_variance)/self.message_count as f32;
@@ -69,8 +76,7 @@ impl TopicStats {
         let current_time_difference = (self.last.time - time) * -1;
         let time_avg_variance= self.time_avg_variance + (current_time_difference - self.time_avg_variance)/ self.message_count as i32;
 
-
-        let kbps = bytes as f64 / current_time_difference.num_nanoseconds().unwrap() as f64 * 8000000.0;
+        let kbs = bytes as f64 / current_time_difference.num_nanoseconds().unwrap() as f64 * 8000000.0;
 
         // generate a new topic stats object - should probably be mutating current struct
         TopicStats{
@@ -80,9 +86,12 @@ impl TopicStats {
             created: self.created,
             message_count,
             bytes_avg,
+            bytes_min,
+            bytes_max,
             bytes_avg_variance,
             time_avg_variance,
-            kbps
+            kbs,
+
         }
     }
 }
@@ -132,10 +141,19 @@ mod stats_tests{
         assert!(tp.time_avg_variance > d);
     }
     #[test]
-    fn kbps() {
+    fn kbs() {
         let mut tp = TopicStats::new(10, 2);
         thread::sleep(Duration::from_secs(1));
         let tp = tp.create_datapoint(20, 2);
-        assert!(tp.kbps > 0.08 );
+        assert!(tp.kbs > 0.08 );
+    }
+
+    #[test]
+    fn min_max(){
+        let mut tp = TopicStats::new(10, 2);
+        let tp = tp.create_datapoint(20, 2);
+
+        assert_eq!(tp.bytes_min, 10);
+        assert_eq!(tp.bytes_max, 20);
     }
 }
